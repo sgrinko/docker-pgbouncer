@@ -64,7 +64,7 @@ ${CLIENT_ENCODING:+client_encoding = ${CLIENT_ENCODING}\n}\
 
 [pgbouncer]
 listen_addr = ${LISTEN_ADDR:-0.0.0.0}
-listen_port = ${LISTEN_PORT:-5432}
+listen_port = ${LISTEN_PORT:-6432}
 unix_socket_dir =
 user = postgres
 auth_file = ${AUTH_FILE:-$PG_CONFIG_DIR/userlist.txt}
