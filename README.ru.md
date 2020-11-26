@@ -53,8 +53,8 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       DEPLOY_PASSWORD: qweasdzxc
       TZ: "Europe/Moscow"
-      EMAILTO: "DBA-PostgreSQL@interfax.ru"
-      EMAIL_SERVER: "extra.devel.ifx"
+      EMAILTO: "PostgreSQL@my_company.ru"
+      EMAIL_SERVER: "mail.my_company.ru"
       EMAIL_HOSTNAME: "myhost@noreplay.ru"
       BACKUP_THREADS: "4"
       BACKUP_MODE: "delta"
