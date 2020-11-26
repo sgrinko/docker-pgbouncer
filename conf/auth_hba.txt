@@ -1,0 +1,8 @@
+# Allow any user on the local system to connect to any database with
+# any database user name using Unix-domain sockets (the default for local
+# connections).
+#
+# TYPE  DATABASE        USER               ADDRESS                 METHOD
+local   all             all                                        peer
+host    all             all                0.0.0.0/0               md5
+host    all             all                ::0/0                   md5
