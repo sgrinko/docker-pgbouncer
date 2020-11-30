@@ -26,11 +26,8 @@ Available tags
 
 Base images:
 
-- `latest` ([Dockerfile](https://github.com/edoburu/docker-pgbouncer/blob/master/Dockerfile)) - Default and latest version.
-- `1.12.0` ([Dockerfile](https://github.com/edoburu/docker-pgbouncer/blob/v1.12.x/Dockerfile)) - Latest version.
-- `1.11.0` ([Dockerfile](https://github.com/edoburu/docker-pgbouncer/blob/v1.11.x/Dockerfile)) - previous version.
-- `1.9.0` ([Dockerfile](https://github.com/edoburu/docker-pgbouncer/blob/v1.9.x/Dockerfile))
-- `1.8.1` ([Dockerfile](https://github.com/edoburu/docker-pgbouncer/blob/v1.8.x/Dockerfile))
+- `latest` ([Dockerfile](https://github.com/sginko/docker-pgbouncer/blob/master/Dockerfile)) - Default and latest version.
+- `1.14` ([Dockerfile](https://github.com/sginko/docker-pgbouncer/blob/v1.14/Dockerfile)) - Latest version.
 
 Images are automatically rebuild on Alpine Linux updates.
 
@@ -41,8 +38,8 @@ Usage
 ```sh
 docker run --rm \
     -e DATABASE_URL="postgres://user:pass@postgres-host/database" \
-    -p 5432:5432 \
-    edoburu/pgbouncer
+    -p 6432:6432 \
+    sgrinko/pgbouncer
 ```
 
 
@@ -54,8 +51,8 @@ docker run --rm \
     -e DB_PASSWORD=pass \
     -e DB_HOST=postgres-host \
     -e DB_NAME=database \
-    -p 5432:5432 \
-    edoburu/pgbouncer
+    -p 6432:6432 \
+    sgrinko/pgbouncer
 ```
 
 Connecting should work as expected:
@@ -67,7 +64,7 @@ psql 'postgresql://user:pass@localhost/dbname'
 Configuration
 -------------
 
-Almost all settings found in the [pgbouncer.ini](https://pgbouncer.github.io/config.html) can be defined as environment variables, except a few that make little sense in a Docker environment (like port numbers, syslog and pid settings). See the [entrypoint script](https://github.com/edoburu/docker-pgbouncer/blob/master/entrypoint.sh) for details. For example:
+Almost all settings found in the [pgbouncer.ini](https://pgbouncer.github.io/config.html) can be defined as environment variables, except a few that make little sense in a Docker environment (like port numbers, syslog and pid settings). See the [entrypoint script](https://github.com/sginko/docker-pgbouncer/blob/master/entrypoint.sh) for details. For example:
 
 ```sh
 docker run --rm \
@@ -75,21 +72,21 @@ docker run --rm \
     -e POOL_MODE=session \
     -e SERVER_RESET_QUERY="DISCARD ALL" \
     -e MAX_CLIENT_CONN=100 \
-    -p 5432:5432
-    edoburu/pgbouncer
+    -p 6432:6432 \
+    sgrinko/pgbouncer
 ```
 
 
 Kubernetes integration
 ----------------------
 
-For example in Kubernetes, see the [examples/kubernetes folder](https://github.com/edoburu/docker-pgbouncer/tree/master/examples/kubernetes).
+For example in Kubernetes, see the [examples/kubernetes folder](https://github.com/sginko/docker-pgbouncer/tree/master/examples/kubernetes).
 
 
 Docker Compose
 --------------
 
-For example in Docker Compose, see the [examples/docker-compose folder](https://github.com/edoburu/docker-pgbouncer/tree/master/examples/docker-compose).
+For example in Docker Compose, see the [examples/docker-compose folder](https://github.com/sginko/docker-pgbouncer/tree/master/examples/docker-compose).
 
 
 PostgreSQL configuration
@@ -115,15 +112,15 @@ docker run --rm \
     -e DB_HOST=postgres-host \
     -e DB_NAME=database \
     -v pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-    -p 5432:5432
-    edoburu/pgbouncer
+    -p 6432:6432
+    sgrinko/pgbouncer
 ```
 
 
 Or extend the `Dockerfile`:
 
 ```Dockerfile
-FROM edoburu/pgbouncer:1.11.0
+FROM sgrinko/pgbouncer:1.14
 COPY pgbouncer.ini userlist.txt /etc/pgbouncer/
 ```
 
@@ -141,12 +138,6 @@ or:
 
 ```
 "username" "md5<md5 of password + username>"
-```
-
-Use [examples/generate-userlist](https://github.com/edoburu/docker-pgbouncer/blob/master/examples/generate-userlist) to generate this file:
-
-```
-examples/generate-userlist >> userlist.txt
 ```
 
 You can also connect with a single user to PgBouncer, and from there retrieve the actual database password

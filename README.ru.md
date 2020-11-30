@@ -2,13 +2,13 @@
 
 Оригинальный код: https://github.com/sgrinko/docker-pgbouncer
 
-Докер основан на образе ([edoburu/pgbouncer](https://hub.docker.com/r/edoburu/pgbouncer))
+Докер основан на образе ([edoburu/pgbouncer](https://hub.docker.com/r/edoburu/pgbouncer)) за что ему большое спасибо!
 
 Исходный код оригинального образа ([edoburu/docker-pgbouncer](https://github.com/edoburu/docker-pgbouncer))
 
 Отличия:
 
-* запуск выполняется под пользователем postgres у которого gid и uid равен 999 (postgres пользователь с такими номерами используется для всех контейнеров)
+* запуск выполняется под пользователем postgres у которого gid = 998 и uid равен 999 (postgres пользователь с такими номерами используется для всех контейнеров)
 
 * порт для службы назначается 6432 (номер по умолчанию для исходного pgbouncer)
 
