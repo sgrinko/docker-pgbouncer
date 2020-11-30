@@ -1,3 +1,7 @@
+# docker-pgbouncer
+
+Оригинальный код: https://github.com/sgrinko/docker-pgbouncer
+
 Докер основан на образе ([edoburu/pgbouncer](https://hub.docker.com/r/edoburu/pgbouncer))
 
 Исходный код оригинального образа ([edoburu/docker-pgbouncer](https://github.com/edoburu/docker-pgbouncer))
@@ -14,6 +18,8 @@
 version: '3.5'
 services:
   pgbouncer:
+
+#    image: grufos/pgbouncer:1.14
     build:
       context: ./docker-pgbouncer
       dockerfile: Dockerfile
@@ -34,6 +40,7 @@ services:
  
   postgres:
  
+#    image: grufos/postgres:12.5
     build:
       context: ./docker-postgres
       dockerfile: Dockerfile
@@ -60,6 +67,7 @@ services:
       BACKUP_MODE: "delta"
  
   pgbouncer:
+#    image: grufos/pgbouncer:1.14
     build:
       context: ./docker-pgbouncer
       dockerfile: Dockerfile
