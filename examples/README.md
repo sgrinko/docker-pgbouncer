@@ -1,4 +1,4 @@
-The [generate-userlist](https://github.com/edoburu/docker-pgbouncer/blob/master/examples/generate-userlist) script generated MD5 encrypted passwords for the userlist.txt file.
+The [generate-userlist](https://github.com/sginko/docker-pgbouncer/blob/master/examples/generate-userlist) script generated MD5 encrypted passwords for the userlist.txt file.
 
 Usage:
 

@@ -4,7 +4,7 @@
 FROM alpine:3.11
 ARG VERSION=1.14.0
 
-LABEL maintainer="Interfax - https://interfax.ru"
+LABEL maintainer="Sergey Grinko <sergey.grinko@gmail.com>"
 
 # Inspiration from https://github.com/gmr/alpine-pgbouncer/blob/master/Dockerfile
 RUN \
@@ -23,7 +23,7 @@ RUN \
   # entrypoint installs the configuation, allow to write as postgres user
   cp etc/pgbouncer.ini /etc/pgbouncer/pgbouncer.ini.example && \
   cp etc/userlist.txt /etc/pgbouncer/userlist.txt.example && \
-  addgroup -g 999 -S postgres 2>/dev/null && \
+  addgroup -g 998 -S postgres 2>/dev/null && \
   adduser -u 999 -S -D -H -h /var/lib/postgresql -g "Postgres user" -s /bin/sh -G postgres postgres 2>/dev/null && \
   chown -R postgres /var/run/pgbouncer /etc/pgbouncer && \
   # Cleanup

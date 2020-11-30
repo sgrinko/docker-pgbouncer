@@ -1,4 +1,4 @@
-IMAGE_NAME=edoburu/pgbouncer
+IMAGE_NAME=sginko/docker-pgbouncer
 IMAGE_VERSION=1.14.0
 
 docker:
