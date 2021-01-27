@@ -37,16 +37,29 @@ if [ -n "$DATABASE_URL" ]; then
   DB_NAME="$(echo $url | grep / | cut -d/ -f2-)"
 fi
 
-# Write the password with MD5 encryption, to avoid printing it during startup.
-# Notice that `docker inspect` will show unencrypted env variables.
-if [ -n "$DB_USER" -a -n "$DB_PASSWORD" ] && ! grep -q "^\"$DB_USER\"" ${PG_CONFIG_DIR}/userlist.txt; then
-  if [ "$AUTH_TYPE" != "plain" ]; then
-     pass="md5$(echo -n "$DB_PASSWORD$DB_USER" | md5sum | cut -f 1 -d ' ')"
-  else
-     pass="$DB_PASSWORD"
+# the file with the password list does not exist
+if [ ! -f ${PG_CONFIG_DIR}/userlist.txt ]; then
+  # Write the password with MD5 encryption, to avoid printing it during startup.
+  # Notice that `docker inspect` will show unencrypted env variables.
+  if [ -n "$DB_PASSWORD" ]; then
+    if [ "${AUTH_TYPE:-hba}" != "plain" ]; then
+       pass="md5$(echo -n "$DB_PASSWORD${DB_USER:-postgres}" | md5sum | cut -f 1 -d ' ')"
+    else
+       pass="$DB_PASSWORD"
+    fi
+    echo "\"${DB_USER:-postgres}\" \"$pass\"" >> ${PG_CONFIG_DIR}/userlist.txt
+    echo "Wrote authentication credentials to ${PG_CONFIG_DIR}/userlist.txt"
   fi
-  echo "\"$DB_USER\" \"$pass\"" >> ${PG_CONFIG_DIR}/userlist.txt
-  echo "Wrote authentication credentials to ${PG_CONFIG_DIR}/userlist.txt"
+fi
+
+if [ ! -f ${PG_CONFIG_DIR}/auth_hba.txt ]; then
+  cp -f /usr/local/bin/auth_hba.txt.tmpl  ${PG_CONFIG_DIR}/auth_hba.txt
+fi
+
+if [ ! -f ${PG_CONFIG_DIR}/pgbouncer.ini ]; then
+  if [ -z "$DB_PASSWORD" ]; then
+    cp -f /usr/local/bin/pgbouncer.ini.tmpl ${PG_CONFIG_DIR}/pgbouncer.ini
+  fi
 fi
 
 if [ ! -f ${PG_CONFIG_DIR}/pgbouncer.ini ]; then
@@ -58,39 +71,39 @@ if [ ! -f ${PG_CONFIG_DIR}/pgbouncer.ini ]; then
   printf "\
 ################## Auto generated ##################
 [databases]
-${DB_NAME:-*} = host=${DB_HOST:?"Setup pgbouncer config error! You must set DB_HOST env"} \
-port=${DB_PORT:-5432} user=${DB_USER:-postgres}
+${DB_NAME:-*} = host=${DB_HOST:-127.0.0.1} port=${DB_PORT:-5432} auth_user=${DB_USER:-postgres}
 ${CLIENT_ENCODING:+client_encoding = ${CLIENT_ENCODING}\n}\
 
 [pgbouncer]
+logfile = /var/log/pgbouncer/pgbouncer.log
+pidfile = /var/run/pgbouncer/pgbouncer.pid
 listen_addr = ${LISTEN_ADDR:-0.0.0.0}
 listen_port = ${LISTEN_PORT:-6432}
-unix_socket_dir =
-user = postgres
+unix_socket_dir = /var/run/postgresql
+unix_socket_mode = 0777
 auth_file = ${AUTH_FILE:-$PG_CONFIG_DIR/userlist.txt}
-${AUTH_HBA_FILE:+auth_hba_file = ${AUTH_HBA_FILE}\n}\
-auth_type = ${AUTH_TYPE:-md5}
-${AUTH_USER:+auth_user = ${AUTH_USER}\n}\
-${AUTH_QUERY:+auth_query = ${AUTH_QUERY}\n}\
-${POOL_MODE:+pool_mode = ${POOL_MODE}\n}\
-${MAX_CLIENT_CONN:+max_client_conn = ${MAX_CLIENT_CONN}\n}\
-${DEFAULT_POOL_SIZE:+default_pool_size = ${DEFAULT_POOL_SIZE}\n}\
+auth_hba_file = ${AUTH_HBA_FILE:-$PG_CONFIG_DIR/auth_hba.txt\n}\
+auth_type = ${AUTH_TYPE:-hba}
+auth_query = ${AUTH_QUERY:-SELECT usename, passwd FROM pg_shadow WHERE usename=$1;\n}\
+pool_mode = ${POOL_MODE:-transaction\n}\
+max_client_conn = ${MAX_CLIENT_CONN:-10000\n}\
+default_pool_size = ${DEFAULT_POOL_SIZE:-5\n}\
 ${MIN_POOL_SIZE:+min_pool_size = ${MIN_POOL_SIZE}\n}\
 ${RESERVE_POOL_SIZE:+reserve_pool_size = ${RESERVE_POOL_SIZE}\n}\
 ${RESERVE_POOL_TIMEOUT:+reserve_pool_timeout = ${RESERVE_POOL_TIMEOUT}\n}\
 ${MAX_DB_CONNECTIONS:+max_db_connections = ${MAX_DB_CONNECTIONS}\n}\
 ${MAX_USER_CONNECTIONS:+max_user_connections = ${MAX_USER_CONNECTIONS}\n}\
-${SERVER_ROUND_ROBIN:+server_round_robin = ${SERVER_ROUND_ROBIN}\n}\
+server_round_robin = ${SERVER_ROUND_ROBIN:-1\n}\
 ignore_startup_parameters = ${IGNORE_STARTUP_PARAMETERS:-extra_float_digits}
 ${DISABLE_PQEXEC:+disable_pqexec = ${DISABLE_PQEXEC}\n}\
 ${APPLICATION_NAME_ADD_HOST:+application_name_add_host = ${APPLICATION_NAME_ADD_HOST}\n}\
 
 # Log settings
-${LOG_CONNECTIONS:+log_connections = ${LOG_CONNECTIONS}\n}\
-${LOG_DISCONNECTIONS:+log_disconnections = ${LOG_DISCONNECTIONS}\n}\
-${LOG_POOLER_ERRORS:+log_pooler_errors = ${LOG_POOLER_ERRORS}\n}\
+log_connections = ${LOG_CONNECTIONS:-0\n}\
+log_disconnections = ${LOG_DISCONNECTIONS:-0\n}\
+log_pooler_errors = ${LOG_POOLER_ERRORS:-1\n}\
 ${LOG_STATS:+log_stats = ${LOG_STATS}\n}\
-${STATS_PERIOD:+stats_period = ${STATS_PERIOD}\n}\
+stats_period = ${STATS_PERIOD:-120\n}\
 ${VERBOSE:+verbose = ${VERBOSE}\n}\
 admin_users = ${ADMIN_USERS:-postgres}
 ${STATS_USERS:+stats_users = ${STATS_USERS}\n}\
@@ -100,8 +113,8 @@ ${SERVER_RESET_QUERY:+server_reset_query = ${SERVER_RESET_QUERY}\n}\
 ${SERVER_RESET_QUERY_ALWAYS:+server_reset_query_always = ${SERVER_RESET_QUERY_ALWAYS}\n}\
 ${SERVER_CHECK_DELAY:+server_check_delay = ${SERVER_CHECK_DELAY}\n}\
 ${SERVER_CHECK_QUERY:+server_check_query = ${SERVER_CHECK_QUERY}\n}\
-${SERVER_LIFETIME:+server_lifetime = ${SERVER_LIFETIME}\n}\
-${SERVER_IDLE_TIMEOUT:+server_idle_timeout = ${SERVER_IDLE_TIMEOUT}\n}\
+server_lifetime = ${SERVER_LIFETIME:-300\n}\
+server_idle_timeout = ${SERVER_IDLE_TIMEOUT:-300\n}\
 ${SERVER_CONNECT_TIMEOUT:+server_connect_timeout = ${SERVER_CONNECT_TIMEOUT}\n}\
 ${SERVER_LOGIN_RETRY:+server_login_retry = ${SERVER_LOGIN_RETRY}\n}\
 ${CLIENT_LOGIN_TIMEOUT:+client_login_timeout = ${CLIENT_LOGIN_TIMEOUT}\n}\
@@ -130,16 +143,17 @@ ${QUERY_TIMEOUT:+query_timeout = ${QUERY_TIMEOUT}\n}\
 ${QUERY_WAIT_TIMEOUT:+query_wait_timeout = ${QUERY_WAIT_TIMEOUT}\n}\
 ${CLIENT_IDLE_TIMEOUT:+client_idle_timeout = ${CLIENT_IDLE_TIMEOUT}\n}\
 ${IDLE_TRANSACTION_TIMEOUT:+idle_transaction_timeout = ${IDLE_TRANSACTION_TIMEOUT}\n}\
-${PKT_BUF:+pkt_buf = ${PKT_BUF}\n}\
+pkt_buf = ${PKT_BUF:-65536\n}\
 ${MAX_PACKET_SIZE:+max_packet_size = ${MAX_PACKET_SIZE}\n}\
-${LISTEN_BACKLOG:+listen_backlog = ${LISTEN_BACKLOG}\n}\
+listen_backlog = ${LISTEN_BACKLOG:-1024\n}\
 ${SBUF_LOOPCNT:+sbuf_loopcnt = ${SBUF_LOOPCNT}\n}\
 ${SUSPEND_TIMEOUT:+suspend_timeout = ${SUSPEND_TIMEOUT}\n}\
-${TCP_DEFER_ACCEPT:+tcp_defer_accept = ${TCP_DEFER_ACCEPT}\n}\
+tcp_defer_accept = ${TCP_DEFER_ACCEPT:-30\n}\
+tcp_socket_buffer = ${TCP_SOCKET_BUFFER:-65536\n}\
 ${TCP_KEEPALIVE:+tcp_keepalive = ${TCP_KEEPALIVE}\n}\
-${TCP_KEEPCNT:+tcp_keepcnt = ${TCP_KEEPCNT}\n}\
-${TCP_KEEPIDLE:+tcp_keepidle = ${TCP_KEEPIDLE}\n}\
-${TCP_KEEPINTVL:+tcp_keepintvl = ${TCP_KEEPINTVL}\n}\
+tcp_keepcnt = ${TCP_KEEPCNT:-3\n}\
+tcp_keepidle = ${TCP_KEEPIDLE:-15\n}\
+tcp_keepintvl = ${TCP_KEEPINTVL:-10\n}\
 ${TCP_USER_TIMEOUT:+tcp_user_timeout = ${TCP_USER_TIMEOUT}\n}\
 ################## end file ##################
 " > ${PG_CONFIG_DIR}/pgbouncer.ini

@@ -1,171 +1,187 @@
-PgBouncer Docker image
-======================
+# docker-pgbouncer
 
-This is a minimal PgBouncer image, based on Alpine Linux.
+Оригинальный код: https://github.com/sgrinko/docker-pgbouncer
 
-Features:
+Докер основан на образе ([edoburu/pgbouncer](https://hub.docker.com/r/edoburu/pgbouncer)) за что ему большое спасибо!
 
-* Very small, quick to pull (just 15MB)
-* Configurable using environment variables
-* Uses standard Postgres port 5432, to work transparently for applications.
-* Includes PostgreSQL client tools such as ``psql``, ``pg_isready``
-* MD5 authentication by default.
-* `/etc/pgbouncer/pgbouncer.ini` and `/etc/pbbouncer/userlist.txt` are auto-created if they don't exist.
+Исходный код оригинального образа ([edoburu/docker-pgbouncer](https://github.com/edoburu/docker-pgbouncer))
 
+Отличия:
 
-Why using PgBouncer
--------------------
+* запуск выполняется под пользователем postgres у которого gid = 998 и uid равен 999 (postgres пользователь с такими номерами используется для всех контейнеров)
 
-PostgreSQL connections take up a lot of memory ([about 10MB per connection](http://hans.io/blog/2014/02/19/postgresql_connection)). There is also a significant startup cost to establish a connection with TLS, hence web applications gain performance by using persistent connections.
+* порт для службы назначается 6432 (номер по умолчанию для исходного pgbouncer)
 
-By placing PgBouncer in between the web application and the actual PostgreSQL database, the memory and start-up costs are reduced. The web application can keep persistent connections to PgBouncer, while PgBouncer only keeps a few connections to the actual PostgreSQL server. It can reuse the same connection for multiple clients.
+* по умолчанию включена hba аутентификация
 
+* Если каталог настроек (/etc/pgbouncer) пуст при старте контейнера, то выполняется создание всех необходимых файлов (pgbouncer.ini, auth_hba.txt, userlist.txt).
 
-Available tags
---------------
+*userlist.txt* - на формирование влияют переменные окружения:
+1-й вариант - использование передачи всей информавции через URI подключения к серверу
 
-Base images:
+| Name | Default value | Description |
+|--------------|--------------|--------------|
+|DATABASE_URL||Строка по формату: `<сервис>://<пользователь>:<пароль>@<хост>:<порт>/<бд>` пример: `postgresql://postgres:qweasdzxc@127.0.0.1:5432/my_db`|
+|AUTH_TYPE|hba|тип аутентификации|
 
-- `latest` ([Dockerfile](https://github.com/sginko/docker-pgbouncer/blob/master/Dockerfile)) - Default and latest version.
-- `1.14` ([Dockerfile](https://github.com/sginko/docker-pgbouncer/blob/v1.14/Dockerfile)) - Latest version.
+2-й вариант - отдельные переменные
 
-Images are automatically rebuild on Alpine Linux updates.
+| Name | Default value | Description |
+|--------------|--------------|--------------|
+|DB_PASSWORD||пароль пользователя (обязателен, для формирования списка пользователей)|
+|DB_USER|postgres|имя пользователя для подключения к БД|
+|AUTH_TYPE|hba|тип аутентификации|
 
-
-Usage
------
-
-```sh
-docker run --rm \
-    -e DATABASE_URL="postgres://user:pass@postgres-host/database" \
-    -p 6432:6432 \
-    sgrinko/pgbouncer
+*auth_hba.txt* - никакие переменные не влияют. Файл создаётся в состоянии:
+```
+# Allow any user on the local system to connect to any database with
+# any database user name using Unix-domain sockets (the default for local
+# connections).
+#
+# TYPE  DATABASE        USER               ADDRESS                 METHOD
+local   all             all                                        peer
+host    all             all                0.0.0.0/0               md5
+host    all             all                ::0/0                   md5
 ```
 
-
-Or using separate variables:
-
-```sh
-docker run --rm \
-    -e DB_USER=user \
-    -e DB_PASSWORD=pass \
-    -e DB_HOST=postgres-host \
-    -e DB_NAME=database \
-    -p 6432:6432 \
-    sgrinko/pgbouncer
-```
-
-Connecting should work as expected:
-
-```sh
-psql 'postgresql://user:pass@localhost/dbname'
-```
-
-Configuration
--------------
-
-Almost all settings found in the [pgbouncer.ini](https://pgbouncer.github.io/config.html) can be defined as environment variables, except a few that make little sense in a Docker environment (like port numbers, syslog and pid settings). See the [entrypoint script](https://github.com/sginko/docker-pgbouncer/blob/master/entrypoint.sh) for details. For example:
-
-```sh
-docker run --rm \
-    -e DATABASE_URL="postgres://user:pass@postgres-host/database" \
-    -e POOL_MODE=session \
-    -e SERVER_RESET_QUERY="DISCARD ALL" \
-    -e MAX_CLIENT_CONN=100 \
-    -p 6432:6432 \
-    sgrinko/pgbouncer
-```
-
-
-Kubernetes integration
-----------------------
-
-For example in Kubernetes, see the [examples/kubernetes folder](https://github.com/sginko/docker-pgbouncer/tree/master/examples/kubernetes).
-
-
-Docker Compose
---------------
-
-For example in Docker Compose, see the [examples/docker-compose folder](https://github.com/sginko/docker-pgbouncer/tree/master/examples/docker-compose).
-
-
-PostgreSQL configuration
-------------------------
-
-Make sure PostgreSQL at least accepts connections from the machine where PgBouncer runs! Update `listen_addresses` in `postgresql.conf` and accept incoming connections from your IP range (e.g. `10.0.0.0/8`) in `pg_hba.conf`:
+*pgbouncer.ini* - почти все параметры можно определить через переменные окружения. Для деталей смотрите файл: entrypoint.sh
+В дефолтные значения файла настроек включены следующие значения:
 
 ```
-# TYPE  DATABASE        USER            ADDRESS                 METHOD
-host    all             all             10.0.0.0/8              md5
+[databases]
+* = host=127.0.0.1 port=5432 auth_user=postgres
+ 
+[pgbouncer]
+logfile = /var/log/pgbouncer/pgbouncer.log
+pidfile = /var/run/pgbouncer/pgbouncer.pid
+listen_addr = 0.0.0.0
+listen_port = 6432
+unix_socket_dir = /var/run/postgresql
+unix_socket_mode = 0777
+auth_file = /etc/pgbouncer/userlist.txt
+auth_hba_file = /etc/pgbouncer/auth_hba.txt
+auth_type = hba
+auth_query = SELECT usename, passwd FROM pg_shadow WHERE usename=/usr/bin/pgbouncer;
+pool_mode = transaction
+max_client_conn = 10000
+default_pool_size = 5
+server_round_robin = 1
+ignore_startup_parameters = extra_float_digits
+ 
+# Log settings
+log_connections = 0
+log_disconnections = 0
+log_pooler_errors = 1
+stats_period = 120
+admin_users = postgres
+ 
+# Connection sanity checks, timeouts
+server_lifetime = 300
+server_idle_timeout = 300
+ 
+# TLS settings
+ 
+# Dangerous timeouts
+pkt_buf = 65536
+listen_backlog = 1024
+tcp_defer_accept = 30
+tcp_socket_buffer = 65536
+tcp_keepcnt = 3
+tcp_keepidle = 15
+tcp_keepintvl = 10
 ```
 
+При наличии в каталоге настроек указанных файлов их содержимое не меняется. В этом случае описанные переменные не используются.
 
-Using a custom configuration
-----------------------------
-
-When the default `pgbouncer.ini` is not sufficient, or you'd like to let multiple users connect through a single PgBouncer instance, mount an updated configuration:
-
-```sh
-docker run --rm \
-    -e DB_USER=user \
-    -e DB_PASSWORD=pass \
-    -e DB_HOST=postgres-host \
-    -e DB_NAME=database \
-    -v pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-    -p 6432:6432
-    sgrinko/pgbouncer
-```
-
-
-Or extend the `Dockerfile`:
-
-```Dockerfile
-FROM sgrinko/pgbouncer:1.14
-COPY pgbouncer.ini userlist.txt /etc/pgbouncer/
-```
-
-
-When the `pgbouncer.ini` file exists, the startup script will not override it. An extra entry will be written to `userlist.txt` when `DATABASE_URL` contains credentials, or `DB_USER` and `DB_PASSWORD` are defined.
-
-The `userlist.txt` file uses the following format:
+Пример docker-compose файла
 
 ```
-"username" "plaintext-password"
+version: '3.5'
+services:
+  pgbouncer:
+#    image: grufos/pgbouncer:1.15
+    build:
+      context: ./docker-pgbouncer
+      dockerfile: Dockerfile
+    volumes:
+      - "/etc/pgbouncer/:/etc/pgbouncer/"
+      - "/var/log/pgbouncer:/var/log/pgbouncer"
+      - "/var/run/postgresql/:/var/run/postgresql/"
+      - "/etc/localtime:/etc/localtime"
+    ports:
+      - "6432:6432"
+    environment:
+# если в каталоге файлов есть файлы настройки то указанные ниже переменные не обрабатываются.
+# если файлы настройки не указываются, то нужно передать в переменных параметры подключения.
+# 1-й вариант - использование передачи через URI подключения к серверу
+#      - DATABASE_URL=postgresql://postgres:qweasdzxc@127.0.0.1:5432
+# 2-й вариант - отдельные переменные.
+# Обязательно нужно указывать DB_PASSWORD
+      - DB_PASSWORD=qweasdzxc
+#      - DB_HOST=127.0.0.1
+#      - DB_PORT=5432
+#      - DB_USER=postgres
 ```
 
-
-or:
-
-```
-"username" "md5<md5 of password + username>"
-```
-
-You can also connect with a single user to PgBouncer, and from there retrieve the actual database password
-by setting ``AUTH_USER``. See the example from: <https://www.cybertec-postgresql.com/en/pgbouncer-authentication-made-easy/>
-
-Connecting to the admin console
--------------------------------
-
-When an *admin user* is defined, and it has a password in the `userlist.txt`, it can connect to the special `pgbouncer` database:
+Рекомендуется запускать этот докер, как докер-спутник для контейнера с postgres:
 
 ```
-psql postgres://postgres@hostname-of-container/pgbouncer  # outside container
-psql postgres://127.0.0.1/pgbouncer                       # inside container
+version: '3.5'
+services:
+ 
+  postgres:
+#    image: grufos/postgres:13.1
+    build:
+      context: ./docker-postgres
+      dockerfile: Dockerfile
+    shm_size: '2gb'
+    command: |
+      -c shared_preload_libraries='plugin_debugger, pg_stat_statements, auto_explain, pg_buffercache, pg_cron, shared_ispell, pg_prewarm'
+    volumes:
+      - "/var/lib/pgsql/13/data:/var/lib/postgresql/data"
+      - "/var/log/postgresql:/var/log/postgresql"
+      - "/var/run/postgresql/:/var/run/postgresql/"
+      - "/mnt/pgbak/:/mnt/pgbak/"
+    ports:
+      - "5432:5432"
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: qweasdzxc
+      POSTGRES_HOST_AUTH_METHOD: trust
+      DEPLOY_PASSWORD: qweasdzxc
+      TZ: "Europe/Moscow"
+      EMAILTO: "DBA-PostgreSQL@interfax.ru"
+      EMAIL_SERVER: "extra.devel.ifx"
+      EMAIL_HOSTNAME: "myhost@noreplay.ru"
+      BACKUP_THREADS: "4"
+      BACKUP_MODE: "delta"
+ 
+  pgbouncer:
+#    image: grufos/pgbouncer:1.15
+    build:
+      context: ./docker-pgbouncer
+      dockerfile: Dockerfile
+    volumes:
+      - "/etc/pgbouncer/:/etc/pgbouncer/"
+      - "/var/log/pgbouncer:/var/log/pgbouncer"
+      - "/var/run/postgresql/:/var/run/postgresql/"
+      - "/etc/localtime:/etc/localtime"
+    ports:
+      - "6432:6432"
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+# если в каталоге файлов есть файлы настройки то указанные ниже переменные не обрабатываются.
+# если файлы настройки не указываются, то нужно передать в переменных параметры подключения.
+# 1-й вариант - использование передачи через URI подключения к серверу
+#      - DATABASE_URL=postgresql://postgres:qweasdzxc@127.0.0.1:5432
+# 2-й вариант - отдельные переменные.
+# Обязательно нужно указывать DB_PASSWORD
+      - DB_PASSWORD=qweasdzxc
+#      - DB_HOST=127.0.0.1
+#      - DB_PORT=5432
+#      - DB_USER=postgres
 ```
 
-Hence this requires a custom configuration, or a mount of a custom ``userlist.txt`` in the docker file.
-Various [admin console commands](https://pgbouncer.github.io/usage.html#admin-console) can be executed, for example:
-
-```
-SHOW STATS;
-SHOW SERVERS;
-SHOW CLIENTS;
-SHOW POOLS;
-```
-
-And it allows temporary disconnecting the backend database (e.g. for restarts) while the web applications keep a connection to PgBouncer:
-
-```
-PAUSE;
-RESUME;
-```
+Обратите внимание, что в файле userlist.txt необходимо указать ваш MD5 хэш для пароля пользователя postgres

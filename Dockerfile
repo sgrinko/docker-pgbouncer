@@ -1,15 +1,15 @@
 # Based on:
 # https://hub.docker.com/r/edoburu/pgbouncer
 #
-FROM alpine:3.11
-ARG VERSION=1.14.0
+FROM alpine:3.13
+ARG VERSION=1.15.0
 
 LABEL maintainer="Sergey Grinko <sergey.grinko@gmail.com>"
 
 # Inspiration from https://github.com/gmr/alpine-pgbouncer/blob/master/Dockerfile
 RUN \
   # Download
-  apk --update add autoconf autoconf-doc automake udns udns-dev curl gcc libc-dev libevent libevent-dev libtool make man openssl-dev pkgconfig postgresql-client && \
+  apk --update add autoconf autoconf-doc automake udns udns-dev curl gcc libc-dev libevent libevent-dev libtool make openssl-dev pkgconfig postgresql-client && \
   curl -o  /tmp/pgbouncer-$VERSION.tar.gz -L https://pgbouncer.github.io/downloads/files/$VERSION/pgbouncer-$VERSION.tar.gz && \
   cd /tmp && \
   # Unpack, compile
@@ -29,13 +29,18 @@ RUN \
   # Cleanup
   cd /tmp && \
   rm -rf /tmp/pgbouncer*  && \
-  apk del --purge autoconf autoconf-doc automake udns-dev curl gcc libc-dev libevent-dev libtool make man libressl-dev pkgconfig
+  apk del --purge autoconf autoconf-doc automake udns-dev curl gcc libc-dev libevent-dev libtool make libressl-dev pkgconfig
 
-ADD entrypoint.sh /entrypoint.sh
+ADD entrypoint.sh /usr/local/bin/entrypoint.sh
+
+COPY conf/auth_hba.txt /usr/local/bin/auth_hba.txt.tmpl
+COPY conf/pgbouncer.ini /usr/local/bin/pgbouncer.ini.tmpl
+
+RUN chmod +x /usr/local/bin/*.sh
 
 USER postgres
 
 EXPOSE 6432
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/usr/bin/pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
